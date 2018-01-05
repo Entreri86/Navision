@@ -1,0 +1,330 @@
+OBJECT Report 50200 Importar Productos
+{
+  OBJECT-PROPERTIES
+  {
+    Date=24/10/16;
+    Time=16:48:13;
+    Modified=Yes;
+    Version List=EVO008;
+  }
+  PROPERTIES
+  {
+    UseReqForm=Yes;
+    ProcessingOnly=Yes;
+    OnInitReport=BEGIN
+                   x:= 1;
+                 END;
+
+  }
+  DATAITEMS
+  {
+    { PROPERTIES
+      {
+        DataItemTable=Table2000000026;
+        DataItemTableView=SORTING(Number);
+        MaxIteration=1;
+        DataItemVarName=ImportarProductos;
+        OnAfterGetRecord=BEGIN
+                               //counter += 1;
+
+                               //localFileName :='*.txt';
+                               sfile.SETRANGE(Path,'\\192.168.1.14\ftp\Productos\');
+                               // Name Filter
+                             sfile.SETFILTER (Name, '%1' , '*.csv');
+                           IF sfile.FINDSET THEN
+                             REPEAT
+                                // Read the file and insert into NAV
+
+
+                               filImp.WRITEMODE := FALSE;
+                               filImp.TEXTMODE := TRUE;
+                               filImp.OPEN(sfile.Path+sfile.Name);
+                               EraseFile := sfile.Path+sfile.Name;
+                               IF (filImp.LEN <> 0) THEN BEGIN //IF is not empty then readfile
+                                 filImp.READ(fileLine);
+                                 REPEAT
+                                   fileLine.GETSUBTEXT(readText, 1, 1024);
+                                   txtReadText := COPYSTR(readText,1,11);
+                                   IF (txtReadText <> 'N§ Producto') AND (txtReadText <> '1;2;3;4;5;6')
+                                   AND (txtReadText <> 'Ventana Pro') THEN BEGIN
+                                     TotalValues := CalcValues(readText,LineValues);
+                                     SaveValues(TotalValues,LineValues);
+                                   END;
+                                 UNTIL filImp.READ(fileLine) = 0;
+                                 filImp.CLOSE;
+                                 CLEAR(filImp);
+                                 processedPathFolder := '\\192.168.1.14\ftp\Productos\Processats\'+sfile.Name;
+                                 processedFile := sfile.Path + sfile.Name;
+                                 FILE.COPY(processedFile, processedPathFolder);
+                                 FILE.ERASE(processedFile);
+                               END;
+                             MESSAGE(Text001,ProdCreado);
+                             UNTIL sfile.NEXT = 0;
+                         END;
+
+      }
+      SECTIONS
+      {
+        { PROPERTIES
+          {
+            SectionType=Body;
+            SectionWidth=12000;
+            SectionHeight=846;
+          }
+          CONTROLS
+          {
+          }
+           }
+      }
+       }
+  }
+  REQUESTFORM
+  {
+    PROPERTIES
+    {
+      Width=6050;
+      Height=2970;
+    }
+    CONTROLS
+    {
+      { 1000000000;CheckBox;3850;1320 ;440  ;440  ;InPage=-1;
+                                                   ShowCaption=No;
+                                                   Description=[<> ];
+                                                   SourceExpr=Bloqueado }
+      { 1000000001;Label  ;440  ;770  ;3300 ;440  ;CaptionML=ESP=Orden Lista }
+      { 1000000002;Label  ;440  ;1320 ;3300 ;440  ;InPage=-1;
+                                                   CaptionML=ESP=Bloqueado }
+      { 1000000003;Label  ;440  ;1870 ;3300 ;440  ;CaptionML=ESP=Personalizado }
+      { 1000000004;TextBox;3850 ;770  ;1700 ;440  ;InPage=-1;
+                                                   SourceExpr=OrdenLista }
+      { 1000000005;CheckBox;3850;1870 ;440  ;440  ;ShowCaption=No;
+                                                   SourceExpr=Personalizado }
+    }
+  }
+  REQUESTPAGE
+  {
+    PROPERTIES
+    {
+    }
+    CONTROLS
+    {
+    }
+  }
+  CODE
+  {
+    VAR
+      localFileName@1000000000 : Text[100];
+      filImp@1000000001 : File;
+      fileLine@1000000002 : BigText;
+      readText@1000000003 : Text[1024];
+      txtReadText@1000000004 : Text[16];
+      LineValues@1000000007 : ARRAY [200] OF Text[250];
+      i@1000000006 : Integer;
+      TotalValues@1000000005 : Integer;
+      ShipmentValues@1000000009 : Code[11];
+      DateValues@1000000008 : Date;
+      x@1000000010 : Integer;
+      UploadedFileName@1000000011 : Text[1024];
+      Text001@1000000012 : TextConst 'ESP=Proceso finalizado correctamente.\Se han creado %1 producto/s.';
+      sfile@1000000013 : Record 2000000022;
+      EraseFile@1000000014 : Text[255];
+      ProdCreado@1000000015 : Integer;
+      processedPathFolder@1000000016 : Text[255];
+      processedFile@1000000017 : Text[255];
+      OrdenLista@1000000018 : Integer;
+      Personalizado@1000000019 : Boolean;
+      Bloqueado@1000000020 : Boolean;
+
+    PROCEDURE UploadFile@6();
+    VAR
+      CommonDialogMgt@1000 : Codeunit 412;
+    BEGIN
+      UploadedFileName := CommonDialogMgt.OpenFile(Text001,localFileName,1,'',0);
+      localFileName := UploadedFileName;
+    END;
+
+    PROCEDURE CalcValues@1000000001(LineText@7141743 : Text[1024];VAR LineValues2@7141745 : ARRAY [200] OF Text[250]) : Integer;
+    VAR
+      x@7141744 : Integer;
+      StrPosNo@1000000000 : Integer;
+    BEGIN
+      //-354
+      x := 1;
+      WHILE STRPOS(LineText,';') <> 0 DO BEGIN
+        LineValues2[x] := COPYSTR(LineText,1,STRPOS(LineText,';')-1);
+        LineText := DELSTR(LineText,1,STRPOS(LineText,';'));
+        x+= 1;
+      END;
+      LineValues2[x] := LineText;
+      EXIT(x);
+      //+354
+    END;
+
+    PROCEDURE SaveValues@1000000000(TotalValues2@7141743 : Integer;LineValues2@7141745 : ARRAY [200] OF Text[250]) : Integer;
+    VAR
+      rItem@1000000000 : Record 27;
+      Nuevo@1000000001 : Boolean;
+      rUnitofMeasure@1000000003 : Record 5404;
+      rUnitofMeasure2@1000000004 : Record 5404;
+      rStockkeeping@1000000002 : Record 5700;
+      rDimension@1000000005 : Record 352;
+      rItemCross@1000000006 : Record 5717;
+      rPurchPrice@1000000007 : Record 7012;
+      cduASCI@1000000008 : Codeunit 50007;
+      CrossReference@1000000009 : Text[30];
+    BEGIN
+      //Creamos Producto B sico
+      Nuevo := FALSE;
+      IF rItem.GET(LineValues[1]) THEN BEGIN
+        ERROR ('El Producto %1, ya existe',LineValues[1]);
+        //CurrReport.SKIP;
+      END ELSE BEGIN
+        Nuevo := TRUE;
+        rItem."No." := LineValues[1];
+        rItem.Description := LineValues[3];
+        rItem."Description 2" := LineValues[4];
+        rItem."Description 3" := LineValues[5];
+        rItem."Search Description" := LineValues[3];
+        rItem."Base Unit of Measure" := LineValues[6];
+        rItem."Gen. Prod. Posting Group" := LineValues[10];
+        rItem."Item Category Code" := LineValues[11];
+        rItem."Product Group Code" := LineValues[12];
+        rItem."VAT Prod. Posting Group" := 'IVA21';
+        rItem."Inventory Posting Group" := LineValues[15];
+        IF LineValues[16] <> '' THEN
+          EVALUATE(rItem."Onu No.",LineValues[16]);
+        rItem."Name & Description" := LineValues[17];
+        rItem."Class 1" := LineValues[18];
+        rItem."Packaging Group" := LineValues[19];
+        rItem."Pack Description" := LineValues[20];
+        EVALUATE(rItem."Net Weight",LineValues[54]);
+
+        IF LineValues[21] <> '' THEN
+          EVALUATE(rItem."Pack Capacity",LineValues[21]);
+        rItem."Vendor No." := LineValues[51];
+        IF Personalizado = TRUE THEN
+          rItem.Personalized := TRUE
+        ELSE
+          rItem.Personalized := FALSE;
+
+        IF OrdenLista <> 0 THEN
+          rItem."Orden de Lista" := FORMAT(OrdenLista);
+
+        IF Bloqueado = TRUE THEN
+          rItem.Blocked := TRUE;
+
+        rItem."Item Disc. Group" := LineValues[11];
+        rItem."Sales Unit of Measure" := LineValues[6];
+        rItem."Purch. Unit of Measure" := LineValues[6];
+        IF rItem.INSERT THEN;
+        IF Nuevo = TRUE THEN BEGIN
+          //Creamos unidades de medida. Inicio
+          IF LineValues[6] <> '' THEN BEGIN
+            rUnitofMeasure."Item No." := LineValues[1];
+            rUnitofMeasure.Code := LineValues[6];
+            IF LineValues[7] <> '' THEN
+              EVALUATE(rUnitofMeasure."Qty. per Unit of Measure",LineValues[7]);
+            //Para productos ISS
+            IF LineValues[8] = '' THEN
+              rUnitofMeasure.PACK := TRUE
+            ELSE
+              rUnitofMeasure.PACK := FALSE;
+
+            IF rUnitofMeasure."Qty. per Unit of Measure" = 1 THEN
+              rUnitofMeasure."UOM Unitary" := TRUE ;
+
+            IF rUnitofMeasure.INSERT THEN;
+          END;
+
+          IF LineValues[8] <> '' THEN BEGIN
+            rUnitofMeasure.RESET;
+            rUnitofMeasure."Item No." := LineValues[1];
+            rUnitofMeasure.Code := LineValues[8];
+            rUnitofMeasure.PACK := TRUE;
+            IF LineValues[9] <> '' THEN
+              EVALUATE(rUnitofMeasure."Qty. per Unit of Measure",LineValues[9]);
+
+            IF rUnitofMeasure."Qty. per Unit of Measure" = 1 THEN
+              rUnitofMeasure."UOM Unitary" := TRUE
+            ELSE
+              rUnitofMeasure."UOM Unitary" := FALSE;
+
+            IF rUnitofMeasure.INSERT THEN;
+          END;
+          //Creamos unidades de medida. F¡n
+          //Creamos unidades de almacenamiento. Inicio
+          IF LineValues[22] <> '' THEN BEGIN
+            rStockkeeping."Location Code" := LineValues[22];
+            rStockkeeping."Item No." := LineValues[1];
+            EVALUATE(rStockkeeping.Coverage,LineValues[26]);
+            IF rStockkeeping.INSERT THEN;
+          END;
+          IF LineValues[27] <> '' THEN BEGIN
+            rStockkeeping."Location Code" := LineValues[27];
+            rStockkeeping."Item No." := LineValues[1];
+            EVALUATE(rStockkeeping.Coverage,LineValues[31]);
+            IF rStockkeeping.INSERT THEN;
+          END;
+          IF LineValues[32] <> '' THEN BEGIN
+            rStockkeeping."Location Code" := LineValues[32];
+            rStockkeeping."Item No." := LineValues[1];
+            EVALUATE(rStockkeeping.Coverage,LineValues[36]);
+            IF rStockkeeping.INSERT THEN;
+          END;
+          //Creamos unidades de almacenamiento. F¡n
+          //Creamos dimensiones. Inicio
+          IF LineValues[37] <> '' THEN BEGIN
+            rDimension."Table ID" := 27;
+            rDimension."No." := LineValues[1];
+            EVALUATE(rDimension."Dimension Code",LineValues[38]);
+            rDimension."Dimension Value Code" := LineValues[39];
+            EVALUATE(rDimension."Value Posting",LineValues[40]);
+            IF rDimension.INSERT THEN;
+          END;
+          //Creamos dimensions. F¡n
+          //Creamos referencias cruzadas. Inicio
+          IF LineValues[41] <> '' THEN BEGIN
+            rItemCross."Item No." := LineValues[1];
+            rItemCross."Unit of Measure" := LineValues[45];
+            EVALUATE(rItemCross."Cross-Reference Type",LineValues[41]);
+            rItemCross."Cross-Reference Type No." := LineValues[42];
+            rItemCross."Cross-Reference No." := LineValues[43];
+            //rItemCross.Description := LineValues[3];
+            IF rItemCross.INSERT THEN;
+          END;
+          IF LineValues[46] <> '' THEN BEGIN
+            rItemCross."Item No." := LineValues[1];
+            rItemCross."Unit of Measure" := LineValues[50];
+            EVALUATE(rItemCross."Cross-Reference Type",'C¢d. barra');
+            rItemCross."Cross-Reference Type No." := LineValues[47];
+            rItemCross."Cross-Reference No." := LineValues[48];
+            //rItemCross.Description := LineValues[3];
+            IF rItemCross.INSERT THEN;
+          END;
+          //Creamos referencias cruzadas. F¡n
+          //Creamos tarifas de compra. Inicio
+          IF LineValues[51] <> '' THEN BEGIN
+            rPurchPrice."Item No." := LineValues[1];
+            rPurchPrice."Vendor No." := LineValues[51];
+            rPurchPrice."Starting Date" := TODAY;
+            EVALUATE(rPurchPrice."Direct Unit Cost",LineValues[52]);
+            IF rPurchPrice.INSERT THEN;
+          END;
+          //Creamos tarifas de compra. F¡n
+        END;
+        //MESSAGE ('Se ha creado el producto');
+        ProdCreado +=1;
+      END;
+    END;
+
+    BEGIN
+    {
+      BNZL oriol.urgell 27/04/15. EVO008 Tratar fichero de transportista CBL cargar la fecha y hora de entrega.
+    }
+    END.
+  }
+  RDLDATA
+  {
+  }
+}
+
