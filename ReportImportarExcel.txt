@@ -1,0 +1,362 @@
+OBJECT Report 50107 Importar Previsiones
+{
+  OBJECT-PROPERTIES
+  {
+    Date=04/01/18;
+    Time=18:15:31;
+    Modified=Yes;
+    Version List=;
+  }
+  PROPERTIES
+  {
+    ProcessingOnly=Yes;
+    OnPreReport=BEGIN
+
+                  ExcelBuffer.LOCKTABLE;
+                  ExcelBuffer.OpenBook(ServerFileName, SheetName);//dos parametros ServerFileName y SheetName
+                  ExcelBuffer.ReadSheet;//Leemos con la funci¢n todo el excel
+                  GetLastRowAndColumn;//Recogemos Col y Filas.
+                  CheckNewForecastPrev(NewForecastPrev);//Comprobamos el tama¤o que no sea superior a 10.
+                  //Valor final del FOR desde el inicio 2, ahora en pruebas a 5!!!
+                  FOR S := 5 TO TotalRows DO //Empezamos desde la Posicion 2 porque sino con los labels REVENTARA.
+                    InsertData(S);//Pasamos a la funcion el contador...
+
+                  ExcelBuffer.DELETEALL;//Borramos del Buffer los valores.
+                END;
+
+    OnPostReport=VAR
+                   Text012@1000000000 : TextConst 'ESP=Se han importado %1 movimientos correctamente.';
+                 BEGIN
+                   MESSAGE(Text012);
+                 END;
+
+  }
+  DATASET
+  {
+    { 1000000001;;DataItem;                  ;
+               DataItemTable=Table99000852 }
+
+  }
+  REQUESTPAGE
+  {
+    PROPERTIES
+    {
+    }
+    CONTROLS
+    {
+      { 1000000000;;Container;
+                  Name=control<1700000001>;
+                  ContainerType=ContentArea }
+
+      { 1000000001;1;Group  ;
+                  Name=<Excel Section>;
+                  CaptionML=ESP=Ajuste Excel;
+                  GroupType=Group }
+
+      { 1000000002;2;Field  ;
+                  Name=FileNameControl;
+                  CaptionML=[ENU=File Name;
+                             ESP=Ruta de archivo];
+                  SourceExpr=FileName;
+                  OnAssistEdit=VAR
+                                 Text001@1000000000 : TextConst 'ESP=Seleccione el fichero a importar.';
+                                 Text007@1000000001 : TextConst 'ESP=El nombre del fichero no puede estar vacio.';
+                                 Text008@1000000002 : TextConst 'ESP=El nombre de la hoja de Excel no puede estar vacio.';
+                               BEGIN
+                                 //FileName := FileManagement.OpenFileDialog(Text001, FileName, FileManagement.GetToFilterText('','.xlsx'));
+                                 ServerFileName := FileManagement.UploadFile(Text001,ExcelExtension);
+                                 FileName := ServerFileName;
+                                 IF ServerFileName = '' THEN
+                                   ERROR(Text007);
+                                 SheetName:= ExcelBuffer.SelectSheetsName(ServerFileName);//Asignamos el nombre de la hoja excl.
+                                 IF SheetName = '' THEN
+                                   ERROR(Text008);
+                               END;
+                                }
+
+      { 1000000003;1;Group  ;
+                  Name=<Warehouse Code>;
+                  CaptionML=ESP=C¢digo almac‚n;
+                  GroupType=Group }
+
+      { 1000000004;2;Field  ;
+                  Name=Location Code;
+                  CaptionML=ESP=C¢digo almac‚n;
+                  SourceExpr=LocationCode;
+                  TableRelation="Bin Content" }
+
+      { 1000000005;1;Group  ;
+                  Name=<Forecast Section>;
+                  CaptionML=ESP=Ajustes previsi¢n;
+                  GroupType=Group }
+
+      { 1000000006;2;Field  ;
+                  Name=ForecastName;
+                  CaptionML=ESP=" C¢digo de Previsi¢n";
+                  NotBlank=Yes;
+                  SourceExpr=ForecastName;
+                  TableRelation="Production Forecast Name" }
+
+      { 1000000007;2;Field  ;
+                  Name=[NewForecast ];
+                  CaptionML=ESP=" Nueva previsi¢n";
+                  NotBlank=Yes;
+                  SourceExpr=NewForecastPrev }
+
+      { 1000000008;2;Group  ;
+                  GroupType=Group }
+
+    }
+  }
+  LABELS
+  {
+  }
+  CODE
+  {
+    VAR
+      FileName@1000000000 : Text;
+      ServerFileName@1000000010 : Text;
+      SheetName@1000000014 : Text;
+      FileFormat@1000000001 : Option;
+      GLDocNo@1000000002 : Code[20];
+      ExcelBuffer@1000000003 : Record 370;
+      TotalRows@1000000004 : Integer;
+      TotalColumns@1000000005 : Integer;
+      itemNo@1000000033 : Code[20];
+      NewForecastPrev@1000000040 : Code[4];
+      recMovsPrevProdAux@1000000006 : Record 99000852;
+      recMovsPrevProdInsert@1000000035 : Record 99000852;
+      ExcelBuff@1000000007 : Record 370;
+      S@1000000008 : Integer;
+      I@1000000029 : Integer;
+      FileIn@1000000009 : File;
+      FileManagement@1000000011 : Codeunit 419;
+      Text001@1000000012 : TextConst 'ESP=Seleccione el fichero a importar.';
+      Text002@1000000018 : TextConst 'ESP=La unidad de medida base del producto %1  no existe.';
+      Text003@1000000021 : TextConst 'ESP=El producto con n§ %1 no existe.';
+      Text004@1000000023 : TextConst 'ESP=La fecha de previsi¢n no puede estar vacia.';
+      Text005@1000000026 : TextConst 'ESP=La fecha entrada en el informe: %1 no puede ser diferente de la fecha de prevision: %2.';
+      Text006@1000000028 : TextConst 'ESP=La cantidad de previsi¢n no puede estar vacia.';
+      Text007@1000000032 : TextConst 'ESP=El valor del a¤o de previsi¢n: %1 no es v lido.';
+      Text008@1000000038 : TextConst 'ESP=No se ha podido realizar la inserci¢n en la tabla de previsi¢n de producci¢n.';
+      ExcelExtension@1000000013 : TextConst 'ESP=.xlsx';
+      recItem@1000000015 : Record 27;
+      nPrevisionProduccion@1000000016 : Code[10];
+      recUnitMesure@1000000017 : Record 5404;
+      LocationCode@1000000019 : Code[20];
+      ForecastName@1000000020 : Code[20];
+      ForecastDate@1000000022 : Date;
+      ForecastTextDate@1000000025 : Text;
+      ForecastTextDateInsert@1000000037 : Text;
+      ForecastFromTableQuantity@1000000027 : Decimal;
+      ForecastFromExcelQuantity@1000000030 : Decimal;
+      ForecastToTableQuantity@1000000031 : Decimal;
+      textUserYear@1000000024 : Text;
+      YearLabel@1000000034 : TextConst 'ESP=20';
+      todayDate@1000000036 : Date;
+      DateBeforeToFilter@1000000041 : Date;
+      FirstDayMonth@1000000042 : Text;
+      LastDayMonth@1000000043 : Text;
+      FromDate@1000000044 : Date;
+      ToDate@1000000045 : Date;
+      MonthDate@1000000046 : Text;
+      EmptyMovPrevProd@1000000039 : Boolean;
+      CantTotal@1000000047 : Decimal;
+
+    PROCEDURE GetLastRowAndColumn@1000000006();
+    BEGIN
+      ExcelBuff.SETRANGE(ExcelBuff."Row No.",1);
+      TotalColumns := 14; //El total no es necesario.
+      ExcelBuff.RESET;
+
+      IF ExcelBuff.FINDLAST THEN
+       TotalRows := ExcelBuff."Row No.";//Recogemos el numero de filas.
+    END;
+
+    PROCEDURE GetValueAtCell@1000000011(RowNo@1000000000 : Integer;ColNo@1000000001 : Integer) : Text;
+    BEGIN
+      IF ExcelBuff.GET(RowNo,ColNo) THEN;
+      EXIT(ExcelBuff."Cell Value as Text");//Devolvemos el valor a Texto.
+    END;
+
+    PROCEDURE GetForecastDate@1000000001(Pos@1000000001 : Integer;YearInText@1000000005 : Text) : Date;
+    VAR
+      DayLabel@1000000002 : TextConst 'ESP=01';
+      Month@1000000003 : Integer;
+      Text009@1000000004 : TextConst 'ESP=El mes de previsi¢n no puede ser %1.';
+      MonthInText@1000000000 : Text;
+      DateInText@1000000006 : Text;
+      FinalForecastDate@1000000007 : Date;
+    BEGIN
+      Month := Pos -2; //Restamos dos por Item No y Descripcion del Excel.
+      IF (Month >12) OR (Month < 0) THEN
+        ERROR(Text009, FORMAT(Month));
+      IF (Month < 10) AND (Month > 0) THEN BEGIN //Hay que ponerle un 0 delante.
+        MonthInText := FORMAT (Month);
+        MonthInText := '0' + MonthInText;
+        DateInText := DayLabel + MonthInText + YearInText;
+      END;
+
+      IF (Month >= 10) THEN
+        DateInText := DayLabel+FORMAT(Month)+YearInText;
+      EVALUATE(FinalForecastDate, DateInText);//Asignamos y devolvemos la fecha
+      EXIT(FinalForecastDate);
+    END;
+
+    PROCEDURE GetMonth@1000000024(Pos@1000000000 : Integer) : Text;
+    VAR
+      Month@1000000001 : Integer;
+      Text011@1000000002 : TextConst 'ESP=El mes no puede ser inferior a 1 ni superior a 12';
+      MonthInText@1000000003 : Text;
+    BEGIN
+      Month := Pos -2;
+      IF (Month >12) OR (Month < 0) THEN
+        ERROR(Text011, FORMAT(Month));
+      IF (Month < 10) AND (Month > 0) THEN BEGIN //Hay que ponerle un 0 delante.
+        MonthInText := FORMAT (Month);
+        MonthInText := '0' + MonthInText;
+      END;
+      IF (Month >= 10) THEN
+        MonthInText := FORMAT (Month);
+      EXIT(MonthInText);
+    END;
+
+    PROCEDURE InsertData@1000000008(RowNo@1000000000 : Integer);
+    VAR
+      YearForForecastDateInText@1000000001 : Text;
+      ItemDescription@1000000002 : Text;
+    BEGIN
+      recMovsPrevProdAux.RESET;
+      recMovsPrevProdInsert.RESET;
+      recUnitMesure.RESET;
+      recItem.RESET;
+      recMovsPrevProdAux.INIT;//Iniciamos las variables...
+      recMovsPrevProdInsert.INIT;
+      recItem.SETRANGE(recItem."No.",GetValueAtCell(RowNo,1));//Fijamos la PK con el No de Producto (Pos1).
+      IF recItem.FIND('-') THEN BEGIN
+        EVALUATE(itemNo, GetValueAtCell(RowNo,1));
+        recUnitMesure.SETRANGE(recUnitMesure.Code, recItem."Base Unit of Measure");
+        IF NOT recUnitMesure.FIND('-') THEN
+          ERROR(Text002, recItem."No.");
+        EVALUATE(recMovsPrevProdInsert."Item No.",GetValueAtCell(RowNo,1));//Numero de Item (Pos1).
+        ItemDescription := CheckDescription(GetValueAtCell(RowNo,2));//Descripci¢n de prod en Excel(Pos2).
+        EVALUATE(recMovsPrevProdInsert.Description, ItemDescription);
+        EVALUATE(recMovsPrevProdInsert."Unit of Measure Code", recItem."Base Unit of Measure");//Pasamos medida base del item.
+        recMovsPrevProdInsert."Qty. per Unit of Measure" := recUnitMesure."Qty. per Unit of Measure";//Asignamos la cantidad por unidad de medida.
+        EVALUATE(recMovsPrevProdInsert."Location Code", LocationCode);//Codigo de almacen entrado en ReqPage.
+        textUserYear := COPYSTR(FORMAT(NewForecastPrev), 3, STRLEN(FORMAT(NewForecastPrev))); //Recogemos el a¤o dos digitos...
+        todayDate := TODAY; //Formato 11-11-11
+        ForecastTextDateInsert := COPYSTR(FORMAT(todayDate), 7, STRLEN(FORMAT(todayDate)));
+        YearForForecastDateInText :=   ForecastTextDateInsert;//Recogemos el a¤o para la funci¢n (solo los dos ultimos digitos).
+        ForecastTextDateInsert := YearLabel + ForecastTextDateInsert;
+        recMovsPrevProdInsert."Production Forecast Name" := ForecastName;//Asignar Variable de la RequestPage Para el nuevo Registro
+
+        FOR I := 3 TO TotalColumns DO BEGIN //Empezamos desde la Pos3(Enero)
+          CantTotal := 0; //Dejamos la variable que cuenta la diferencia a cero
+          //SETFILTER en fecha, recoger valor concreto de la fecha para el calculo.
+          //TBL 99000851 hay que crear el valor del a¤o 2018 no???
+          MonthDate := FORMAT(GetMonth(I));// Mes en Formato Date
+          DateBeforeToFilter := GetForecastDate (I, textUserYear);//Tenemos aqui el mes y a¤o al corriente, faltan los d¡as.
+          FirstDayMonth := FORMAT(CALCDATE ('<-CM>',DateBeforeToFilter));
+          LastDayMonth := FORMAT(CALCDATE ('<CM>', DateBeforeToFilter));
+          EVALUATE(FromDate, COPYSTR(FirstDayMonth,1,3) + MonthDate + textUserYear);
+          EVALUATE(ToDate, COPYSTR(LastDayMonth,1,3) + MonthDate + textUserYear);
+          recMovsPrevProdAux.SETRANGE(recMovsPrevProdAux."Production Forecast Name", ForecastName);
+          recMovsPrevProdAux.SETRANGE(recMovsPrevProdAux."Item No.", itemNo);
+          recMovsPrevProdAux.SETFILTER(recMovsPrevProdAux."Forecast Date",'%1..%2', FromDate, ToDate);
+          IF NOT recMovsPrevProdAux.FIND('-') THEN //Si no hay ningun valor, es que no hay comparaci¢n de ese objeto ese a¤o.
+            EmptyMovPrevProd := TRUE
+          ELSE
+            EmptyMovPrevProd := FALSE;
+
+          IF EmptyMovPrevProd = TRUE THEN
+            ForecastDate := GetForecastDate (I, textUserYear) //Le pasamos el a¤o a comparar del entrado en la RequestPage
+          ELSE
+            ForecastDate := recMovsPrevProdAux."Forecast Date";// Si no recogemos el valor de la tabla.
+          //CheckDates(ForecastName, ForecastDate);//Comprobamos fechas...
+          ForecastFromTableQuantity := recMovsPrevProdAux."Forecast Quantity";
+          EVALUATE(ForecastFromExcelQuantity, GetValueAtCell(RowNo, I));
+          CLEAR(recMovsPrevProdInsert."Entry No.");//Limpiamos el movimiento para el auto-asignamiento.
+          recMovsPrevProdInsert."Forecast Date" := GetForecastDate (I, YearForForecastDateInText);//Pasamos a¤o y Pos para que asigne fecha.
+          IF ForecastFromTableQuantity > ForecastFromExcelQuantity THEN BEGIN //Si el valor de la tabla es mayor al del excel...
+             CLEAR(recMovsPrevProdAux);//Limpiamos la variable entera.
+             recMovsPrevProdAux.SETRANGE(recMovsPrevProdAux."Production Forecast Name",ForecastName);
+             recMovsPrevProdAux.SETRANGE(recMovsPrevProdAux."Item No.",itemNo);
+             recMovsPrevProdAux.SETFILTER(recMovsPrevProdAux."Forecast Date",'%1..%2', FromDate, ToDate);
+             IF recMovsPrevProdAux.FINDSET THEN BEGIN
+               REPEAT
+                 CantTotal += recMovsPrevProdAux."Forecast Quantity";
+               UNTIL recMovsPrevProdAux.NEXT = 0;
+             END;
+             ForecastToTableQuantity := ForecastFromExcelQuantity - CantTotal;
+             recMovsPrevProdInsert."Forecast Quantity" := ForecastToTableQuantity;
+             recMovsPrevProdInsert."Forecast Quantity (Base)" := ForecastToTableQuantity;
+             IF ForecastToTableQuantity <> 0 THEN BEGIN
+               IF NOT recMovsPrevProdInsert.INSERT(TRUE) THEN
+                 ERROR(Text008);
+             END;
+          END ELSE
+             IF ForecastFromExcelQuantity > ForecastFromTableQuantity THEN BEGIN //Si el valor del excel es mayor al de la tabla...
+             CLEAR(recMovsPrevProdAux);
+             recMovsPrevProdAux.SETRANGE(recMovsPrevProdAux."Production Forecast Name",ForecastName);
+             recMovsPrevProdAux.SETRANGE(recMovsPrevProdAux."Item No.",itemNo);
+             recMovsPrevProdAux.SETFILTER(recMovsPrevProdAux."Forecast Date",'%1..%2', FromDate, ToDate);
+             IF recMovsPrevProdAux.FINDSET THEN BEGIN
+               REPEAT
+                 CantTotal += recMovsPrevProdAux."Forecast Quantity";
+               UNTIL recMovsPrevProdAux.NEXT = 0;
+             END;
+                ForecastToTableQuantity := ForecastFromExcelQuantity - CantTotal;
+                recMovsPrevProdInsert."Forecast Quantity" := ForecastToTableQuantity;
+                recMovsPrevProdInsert."Forecast Quantity (Base)" := ForecastToTableQuantity;
+                IF ForecastToTableQuantity <> 0 THEN BEGIN
+                  IF NOT recMovsPrevProdInsert.INSERT(TRUE) THEN
+                    ERROR(Text008);
+                END;
+             END;
+        END;
+      END ELSE //Si no existe el item...
+        ERROR(Text003, recItem."No.");
+    END;
+
+    PROCEDURE CheckDates@1000000003(ForecastYear@1000000000 : Code[20];ForecastDate@1000000001 : Date);
+    BEGIN
+      IF ForecastDate = 0D THEN  //Si fecha esta vacia...Error
+        ERROR(Text004);
+      ForecastTextDate := COPYSTR(FORMAT(ForecastDate), 7, STRLEN(FORMAT(ForecastDate)));//Desde pos 6 a fin.
+      ForecastTextDate := YearLabel + ForecastTextDate; //Ponemos 20 delante.
+      IF ForecastTextDate <> FORMAT (ForecastYear) THEN // Si el a¤o a comparar no concuerda...
+        ERROR(Text005, FORMAT(ForecastYear), ForecastTextDate);
+    END;
+
+    PROCEDURE CheckDescription@1000000005(Description@1000000000 : Text) : Text;
+    VAR
+      DescLenght@1000000001 : Integer;
+      SplitDescription@1000000002 : Text;
+    BEGIN
+      DescLenght := STRLEN(Description);
+      IF DescLenght <= 50 THEN
+        EXIT(Description)
+      ELSE
+        SplitDescription := COPYSTR(Description, 1, 50);
+        EXIT(SplitDescription);
+    END;
+
+    PROCEDURE CheckNewForecastPrev@1000000004(Name@1000000000 : Code[10]);
+    VAR
+      NameLenght@1000000001 : Integer;
+      Text010@1000000002 : TextConst 'ESP=El codigo para el nombre de previsi¢n no puede ser superior a 10 caracteres.';
+    BEGIN
+      NameLenght := STRLEN (Name);
+      IF NameLenght > 10 THEN
+        ERROR(Text010);
+    END;
+
+    BEGIN
+    END.
+  }
+  RDLDATA
+  {
+  }
+}
+
