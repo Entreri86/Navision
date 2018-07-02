@@ -1,0 +1,844 @@
+OBJECT Report 50028 Import Items
+{
+  OBJECT-PROPERTIES
+  {
+    Date=08/06/18;
+    Time=[ 9:56:24];
+    Modified=Yes;
+    Version List=ACT A01;
+  }
+  PROPERTIES
+  {
+    CaptionML=[ENU=Import Items;
+               ESP=Importar Productos];
+    ProcessingOnly=Yes;
+    OnPreReport=BEGIN
+
+                  ExcelBuffer.LOCKTABLE;
+                  ExcelBuffer.OpenBook(ServerFileName, SheetName);//dos parametros ServerFileName y SheetName para el nombre de la  hoja seleccionada.
+                  ExcelBuffer.ReadSheet;//Leemos con la funci¢n todo el excel
+                  GetLastRowAndColumn;//Recogemos Col y Filas.
+
+                  //Valor final del FOR desde el inicio 2
+                  FOR S := 2 TO TotalRows DO //Empezamos desde la Posicion 2 porque sino con los labels REVENTARA.
+                    InsertData(S);//Pasamos a la funcion el contador...
+
+                  ExcelBuffer.DELETEALL;//Borramos del Buffer los valores.
+                END;
+
+    OnPostReport=VAR
+                   Text012@1000000000 : TextConst 'ENU=%1 items were successfully imported from %2 items.;ESP=Se han importado %1 productos correctamente de %2 productos.';
+                 BEGIN
+                   MESSAGE(Text012, ImportedItems, TotalItems); //Mostramos mensaje informativo.
+                 END;
+
+  }
+  DATASET
+  {
+    { 1000000001;;DataItem;                  ;
+               DataItemTable=Table27 }
+
+  }
+  REQUESTPAGE
+  {
+    PROPERTIES
+    {
+    }
+    CONTROLS
+    {
+      { 1000000000;;Container;
+                  Name=control<1700000001>;
+                  ContainerType=ContentArea }
+
+      { 1000000001;1;Group  ;
+                  Name=<Excel Section>;
+                  CaptionML=ESP=Ajuste Excel;
+                  GroupType=Group }
+
+      { 1000000002;2;Field  ;
+                  Name=FileNameControl;
+                  CaptionML=[ENU=File Name;
+                             ESP=Ruta de archivo];
+                  SourceExpr=FileName;
+                  OnAssistEdit=VAR
+                                 Text001@1000000000 : TextConst 'ESP=Seleccione el fichero a importar.';
+                                 Text007@1000000001 : TextConst 'ESP=El nombre del fichero no puede estar vacio.';
+                                 Text008@1000000002 : TextConst 'ESP=El nombre de la hoja de Excel no puede estar vacio.';
+                               BEGIN
+                                 //FileName := FileManagement.OpenFileDialog(Text001, FileName, FileManagement.GetToFilterText('','.xlsx'));
+                                 ServerFileName := FileManagement.UploadFile(Text001,ExcelExtension);
+                                 FileName := ServerFileName;
+                                 IF ServerFileName = '' THEN
+                                   ERROR(Text007);
+                                 SheetName:= ExcelBuffer.SelectSheetsName(ServerFileName);//Asignamos el nombre de la hoja excl.
+                                 IF SheetName = '' THEN
+                                   ERROR(Text008);
+                               END;
+                                }
+
+      { 1000000008;2;Group  ;
+                  GroupType=Group }
+
+    }
+  }
+  LABELS
+  {
+  }
+  CODE
+  {
+    VAR
+      FileName@1000000000 : Text;
+      ServerFileName@1000000010 : Text;
+      SheetName@1000000014 : Text;
+      FileFormat@1000000001 : Option;
+      GLDocNo@1000000002 : Code[20];
+      ExcelBuffer@1000000003 : Record 370;
+      XlWrkBkWriter@1000000071 : DotNet "'Microsoft.Dynamics.Nav.OpenXml, Version=9.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35'.Microsoft.Dynamics.Nav.OpenXml.Spreadsheet.WorkbookWriter";
+      TotalRows@1000000004 : Integer;
+      TotalColumns@1000000005 : Integer;
+      ExcelBuff@1000000007 : Record 370;
+      S@1000000008 : Integer;
+      FileIn@1000000009 : File;
+      FileManagement@1000000011 : Codeunit 419;
+      Text001@1000000012 : TextConst 'ESP=Seleccione el fichero a importar.';
+      Text002@1000000018 : TextConst 'ESP=La unidad de medida base del producto %1  no existe.';
+      Text005@1000000026 : TextConst 'ESP=La fecha entrada en el informe: %1 no puede ser diferente de la fecha de prevision: %2.';
+      Text006@1000000028 : TextConst 'ESP=La cantidad de previsi¢n no puede estar vacia.';
+      Text007@1000000032 : TextConst 'ESP=El valor del a¤o de previsi¢n: %1 no es v lido.';
+      Text008@1000000038 : TextConst 'ESP=No se ha podido realizar la inserci¢n en la tabla de previsi¢n de producci¢n.';
+      ExcelExtension@1000000013 : TextConst 'ESP=.xlsx';
+      YearLabel@1000000034 : TextConst 'ESP=20';
+      DimensionManagement@1000000091 : Codeunit 408;
+      ImportedItems@1000000047 : Integer;
+      TotalItems@1000000070 : Integer;
+      HaveItem@1000000088 : Boolean;
+      HasGotGLSetup@1000000090 : Boolean;
+      HaveDirectUnitCost@1000000087 : Boolean;
+      HaveUnitMesureCode@1000000086 : Boolean;
+      HaveUnitMesureInBd@1000000085 : Boolean;
+      HaveGenProdPostGroupCode@1000000084 : Boolean;
+      HaveGenProdPostGroupInBd@1000000083 : Boolean;
+      HaveVATProdPostGroupCode@1000000082 : Boolean;
+      HaveVATProdPostGroupInBd@1000000081 : Boolean;
+      HavePurchasePriceInBd@1000000080 : Boolean;
+      HaveInvntPostGroup@1000000079 : Boolean;
+      HaveInvntPostGroupInBd@1000000078 : Boolean;
+      HaveHeight@1000000077 : Boolean;
+      HaveWeight@1000000076 : Boolean;
+      HaveWidth@1000000075 : Boolean;
+      HaveLength@1000000074 : Boolean;
+      HaveQtyPerUnitMesure@1000000073 : Boolean;
+      HaveProductGroup@1000000072 : Boolean;
+      HaveItemCategoryCode@1000000069 : Boolean;
+      HaveGlbDimCode1@1000000068 : Boolean;
+      HaveGlbDimCode2@1000000067 : Boolean;
+      HaveItemDiscountGroup@1000000066 : Boolean;
+      HaveVendorNo@1000000065 : Boolean;
+      HaveItemCatalogue@1000000064 : Boolean;
+      HaveUnitPrice@1000000063 : Boolean;
+      HavePVPRecommended@1000000062 : Boolean;
+      HaveGrossWeight@1000000061 : Boolean;
+      HaveTariff@1000000060 : Boolean;
+      HaveTariffInBd@1000000059 : Boolean;
+      HaveVariantCode@1000000058 : Boolean;
+      HaveVariantColor@1000000057 : Boolean;
+      HaveVariantInBd@1000000056 : Boolean;
+      HaveItemCrossreferenceInBd@1000000055 : Boolean;
+      HaveSalesPriceInBd@1000000054 : Boolean;
+      HaveVariantSize@1000000053 : Boolean;
+      HaveCustomerPriceGroup@1000000052 : Boolean;
+      HaveCurrencyCode@1000000051 : Boolean;
+      HaveItemCrossReferenceTipeNo@1000000050 : Boolean;
+      ItemCatalogue@1000000049 : Boolean;
+      ItemCrossReferenceTipeNo@1000000048 : Code[20];
+      VariantSizeCode@1000000046 : Code[20];
+      VariantColorCode@1000000045 : Code[20];
+      VariantCode@1000000044 : Code[20];
+      TariffCode@1000000043 : Code[20];
+      ItemNoCode@1000000042 : Code[20];
+      UnitMesureCode@1000000041 : Code[20];
+      GenProdPostGroupCode@1000000040 : Code[10];
+      VATProdPostGroupCode@1000000039 : Code[10];
+      InventoryPostingGroupCode@1000000037 : Code[20];
+      ProductGroupCode@1000000036 : Code[20];
+      ItemCategoryCode@1000000035 : Code[20];
+      GlbDimCode1@1000000033 : Code[20];
+      GlbDimCode2@1000000031 : Code[20];
+      ItemDiscountGroupCode@1000000030 : Code[20];
+      VendorNoCode@1000000029 : Code[20];
+      CustomerGroupCode@1000000027 : Code[20];
+      CurrencyCode@1000000025 : Code[20];
+      GLSetupShortcutDimCode@1000000089 : ARRAY [8] OF Code[20];
+      Height@1000000024 : Decimal;
+      Weight@1000000023 : Decimal;
+      Width@1000000022 : Decimal;
+      Length@1000000021 : Decimal;
+      UnitPrice@1000000020 : Decimal;
+      PVPRecommended@1000000019 : Decimal;
+      GrossWeight@1000000017 : Decimal;
+      QtyPerUnitMesure@1000000016 : Decimal;
+      DirectUnitCost@1000000015 : Decimal;
+      ItemDescription@1000000006 : Text;
+
+    LOCAL PROCEDURE GetLastRowAndColumn@1000000006();
+    BEGIN
+      ExcelBuff.SETRANGE(ExcelBuff."Row No.",1);
+      TotalColumns := 28;
+      ExcelBuff.RESET;
+
+      IF ExcelBuff.FINDLAST THEN
+       TotalRows := ExcelBuff."Row No.";//Recogemos el numero de filas.
+    END;
+
+    LOCAL PROCEDURE InsertData@1000000008(RowNo@1000000000 : Integer);
+    VAR
+      ItemRec@1000000006 : Record 27;
+      UnitMesure@1000000008 : Record 5404;
+      GenProductPostingGroup@1000000014 : Record 251;
+      VATProductPostingGroup@1000000015 : Record 324;
+      InventoryPostingGroup@1000000017 : Record 94;
+      TariffNumber@1000000049 : Record 260;
+      ItemVariant@1000000052 : Record 5401;
+      Text003@1000000009 : TextConst 'ENU=The item with number %1 already exists.;ESP=El producto con n§ %1 ya existe.';
+      SalesPrice@1000000001 : Record 7002;
+      Text004@1000000002 : TextConst 'ENU=The item with code %1 already exists in the sales price.;ESP=El producto con codigo %1 ya existe en el precio de venta.';
+      ItemCrossReference@1000000003 : Record 5717;
+      PurchasePrice@1000000004 : Record 7012;
+      ItemCategory@1000000005 : Record 5722;
+      ItemDiscountGroup@1000000081 : Record 341;
+      ProductGroup@1000000007 : Record 5723;
+      EUCurrencyTag@1000000010 : TextConst 'ENU=EUR';
+    BEGIN
+      //***************************************************
+      //Reseteamos los records.
+      ItemRec.RESET;
+      TariffNumber.RESET;
+      UnitMesure.RESET;
+      InventoryPostingGroup.RESET;
+      GenProductPostingGroup.RESET;
+      VATProductPostingGroup.RESET;
+      ItemVariant.RESET;
+      PurchasePrice.RESET;
+      ItemCrossReference.RESET;
+      ItemCategory.RESET;
+      ProductGroup.RESET;
+      ItemDiscountGroup.RESET;
+      //***************************************************
+
+      ItemRec.SETRANGE(ItemRec."No.",GetValueAtCell(RowNo,1));
+      IF ItemRec.FINDFIRST THEN //Si existe el item, significa que tiene mas de una variante!
+        VariantManagement(ItemVariant,ItemRec,RowNo,TRUE)
+      ELSE //Si no existe el item...
+        TotalItems += 1;//Aumentamos contador de los items a importar.
+        EVALUATE(ItemNoCode, GetValueAtCell(RowNo,1));//Codigo de Producto en Pos 1.
+        HaveItem := IsEmpty(ItemNoCode);
+        IF HaveItem THEN BEGIN//Si el ItemNoCode esta vacio escapamos la fila, si tiene valor recorremos las filas.
+          ItemDescription := CheckDescription(GetValueAtCell(RowNo,2));//Descripci¢n de prod en Excel(Pos2).
+          ItemRec."No." := ItemNoCode;//Asignamos el Numero de Item.
+          ItemRec.Description := ItemDescription;//Asignamos descripci¢n
+          ItemRec."Search Description" := ItemDescription;
+          ItemRec."Descripcion Web" := ItemDescription;
+          //N§ Proveedor
+          HaveVendorNo := IsEmpty(GetValueAtCell(RowNo,3));
+          IF HaveVendorNo THEN BEGIN
+            EVALUATE(VendorNoCode, GetValueAtCell(RowNo,3));
+            ItemRec."Vendor No." := VendorNoCode;
+          END;
+          //Grupo contable producto. TBL 251
+          HaveGenProdPostGroupCode := IsEmpty(GetValueAtCell(RowNo,4));
+          IF HaveGenProdPostGroupCode THEN
+            GenProdPostingGroupManagement(GenProductPostingGroup,ItemRec,RowNo);
+
+          //Grupo Registro IVA producto
+          HaveVATProdPostGroupCode := IsEmpty(GetValueAtCell(RowNo,5));
+          IF HaveVATProdPostGroupCode THEN
+            VATProductPostingGroupManagement(VATProductPostingGroup,ItemRec,RowNo);
+
+          //Grupo contable Inventario.
+          HaveInvntPostGroup := IsEmpty(GetValueAtCell(RowNo,6));
+          IF HaveInvntPostGroup THEN
+            InventoryPostingGroupManagament(InventoryPostingGroup,ItemRec,RowNo);
+
+          //Unidades de medida.
+          HaveUnitMesureCode := IsEmpty(GetValueAtCell(RowNo,7));//Le pasamos la unidad de medida para comprobaciones.
+          IF HaveUnitMesureCode THEN //Si no hay unidad de medida escapamos la fila.
+            UnitMesureManagement(ItemRec,UnitMesure,RowNo);
+
+          //Codigo categoria producto
+          HaveItemCategoryCode := IsEmpty(GetValueAtCell(RowNo,11));
+          IF HaveItemCategoryCode THEN
+            ItemCategoryManagement(ItemCategory,ItemRec,RowNo);
+
+          //Codigo grupo producto
+          HaveProductGroup := IsEmpty(GetValueAtCell(RowNo, 12));
+          IF HaveProductGroup THEN
+            ProductGroupManagement(ProductGroup,ItemRec,RowNo);
+
+          //Codigo Marca
+          HaveGlbDimCode1 := IsEmpty(GetValueAtCell(RowNo,13));
+          IF HaveGlbDimCode1 THEN BEGIN
+            EVALUATE(GlbDimCode1, GetValueAtCell(RowNo,13));
+            ItemRec."Global Dimension 1 Code" := GlbDimCode1;
+          END;
+          //Codigo Temporada
+          HaveGlbDimCode2 := IsEmpty (GetValueAtCell(RowNo,14));
+          IF HaveGlbDimCode2 THEN BEGIN
+            EVALUATE(GlbDimCode2, GetValueAtCell(RowNo,14));
+            ItemRec."Global Dimension 2 Code" := GlbDimCode2;
+          END;
+          //Grupo descuento producto
+          HaveItemDiscountGroup := IsEmpty(GetValueAtCell(RowNo,15));
+          IF HaveItemDiscountGroup THEN
+            ItemDiscountGroupManagement(ItemDiscountGroup,ItemRec,RowNo);
+
+          //Producto en Catalogo, Lo quieren en si siempre.
+          HaveItemCatalogue := IsEmpty(GetValueAtCell(RowNo,8));//Comprobamos que este o no vacio el campo.
+          IF HaveItemCatalogue THEN BEGIN
+            EVALUATE(ItemCatalogue, GetValueAtCell(RowNo,8));
+            ItemCatalogue := IsEmpty(ItemCatalogue);//Comprobamos la segunda vez, reasignando para conocer si es TRUE o FALSE.
+            ItemRec."Producto en Catalogo" := ItemCatalogue;
+          END;
+          //Precio Venta
+          HaveUnitPrice := IsEmpty(GetValueAtCell(RowNo,20));
+          IF HaveUnitPrice THEN BEGIN
+            EVALUATE(UnitPrice, GetValueAtCell(RowNo,20));
+            ItemRec."Unit Price" := UnitPrice;
+          END;
+          //PVP Recomendado
+          HavePVPRecommended := IsEmpty(GetValueAtCell(RowNo,21));
+          IF HavePVPRecommended THEN BEGIN
+            EVALUATE(PVPRecommended, GetValueAtCell(RowNo,21));
+            ItemRec."PVP recomendado" := PVPRecommended;
+          END;
+          //Peso Bruto
+          HaveGrossWeight := IsEmpty(GetValueAtCell(RowNo,24));
+          IF HaveGrossWeight THEN BEGIN
+            EVALUATE(GrossWeight, GetValueAtCell(RowNo,24));
+            ItemRec."Gross Weight" := GrossWeight;
+          END;
+          //Codigo arancelario TBL 260
+          HaveTariff := IsEmpty(GetValueAtCell(RowNo,22));
+          IF HaveTariff THEN
+            TariffNumberManagement(TariffNumber,ItemRec,RowNo);
+
+          //Variantes Producto
+          HaveVariantCode := IsEmpty(GetValueAtCell(RowNo,18));
+          IF HaveVariantCode THEN
+            VariantManagement(ItemVariant,ItemRec,RowNo,FALSE);
+
+          //Codigo divisa
+          HaveCurrencyCode := IsEmpty(GetValueAtCell(RowNo,28));
+          IF HaveCurrencyCode THEN
+            EVALUATE(CurrencyCode, GetValueAtCell(RowNo,28))
+          ELSE //Si no hay divisa....
+            BEGIN
+              CurrencyCode := EUCurrencyTag;// Divisa por defecto EUR
+              HaveCurrencyCode := TRUE;
+            END;
+
+          //Grupo precio Cliente Anulado por cliente.
+      //    HaveCustomerPriceGroup := IsEmpty(GetValueAtCell(RowNo,26));
+      //    IF HaveCustomerPriceGroup THEN
+      //      EVALUATE(CustomerGroupCode, GetValueAtCell(RowNo,26));
+
+          //A petici¢n del cliente => Utilizar transito directo NO.
+          ItemRec."Use Cross-Docking" := FALSE;
+
+          //Zona referencia cruzada
+          HaveItemCrossReferenceTipeNo := IsEmpty(GetValueAtCell(RowNo,19));
+          IF HaveItemCrossReferenceTipeNo  THEN
+            ItemCrossReferenceManagement(ItemCrossReference,RowNo);
+
+          //Purchase Price 7012
+          HaveDirectUnitCost := IsEmpty(GetValueAtCell(RowNo,9));
+          IF HaveDirectUnitCost THEN
+            PurchasePriceManagement(PurchasePrice,ItemRec,RowNo);
+        END;
+        //En futuro a¤adir funcion que reciba un variant y en caso de no realizar el Insert que lo guarde en otra hoja del Excel con el motivo
+        //de porque no se ha a¤adido el producto, o en que tabla ha fallado el insert!!
+      IF HaveItem THEN BEGIN
+        IF ItemRec.INSERT(TRUE) THEN BEGIN
+          ImportedItems += 1;
+          IF HaveGlbDimCode1 THEN //Despues de insertar el Item se validan las dimensiones.
+            ValidateShortcutDimCode(1,GlbDimCode1,ItemRec);
+          ItemRec.VALIDATE(ItemRec."Global Dimension 1 Code",GlbDimCode1);
+          IF HaveGlbDimCode2 THEN
+            ValidateShortcutDimCode(2,GlbDimCode2,ItemRec);
+          ItemRec.VALIDATE(ItemRec."Global Dimension 2 Code",GlbDimCode2);
+        END;
+      END;
+      //************************************************************************************************************************************
+      //Zona de comprobaciones e inserciones, deben estar las PK y no estar en la BBDD ya insertados los registros.
+      IF (NOT HaveTariffInBd) AND HaveTariff THEN
+        TariffNumber.INSERT(TRUE);
+      IF (NOT HaveUnitMesureInBd) AND HaveUnitMesureCode THEN
+        UnitMesure.INSERT(TRUE);
+      IF (NOT HaveInvntPostGroupInBd) AND HaveInvntPostGroup THEN
+        InventoryPostingGroup.INSERT(TRUE);
+      IF (NOT HaveGenProdPostGroupInBd) AND HaveGenProdPostGroupCode THEN
+        GenProductPostingGroup.INSERT(TRUE);
+      IF (NOT HaveVATProdPostGroupInBd) AND HaveVATProdPostGroupCode THEN
+        VATProductPostingGroup.INSERT(TRUE);
+      IF (NOT HaveVariantInBd) AND HaveVariantCode THEN
+        ItemVariant.INSERT(TRUE);
+      IF (NOT HaveItemCrossreferenceInBd) AND HaveUnitMesureCode AND HaveItemCrossReferenceTipeNo THEN //AND HaveVariantCode
+        ItemCrossReference.INSERT(TRUE);
+      IF (HaveItem) AND (HaveVendorNo) AND (HaveCurrencyCode) AND(NOT HavePurchasePriceInBd)
+        AND (HaveUnitMesureCode) AND (HaveCurrencyCode) THEN BEGIN //AND (HaveVariantCode)
+        IF PurchasePrice.INSERT(TRUE) THEN;
+      END;
+      //Fin de zona de inserciones.
+      //************************************************************************************************************************************
+      //Limpieza de Variables
+      ClearVariables();
+
+      //Deshabilitado por el cliente.
+      //Precio venta, se inserta solo si las PK estan completas, deshabilitado por el cliente.
+      // IF (HaveItem) AND (HaveCustomerPriceGroup) AND (HaveCurrencyCode) AND (HaveSalesPriceInBd)
+      //  AND (HaveVariantCode) AND (HaveUnitMesureCode) AND (HavePVPRecommended) THEN
+      //  BEGIN
+      //    SalesPrice.SetMassiveItemImport(TRUE);
+      //    SalesPrice.INSERT(TRUE);
+      //  END;
+      //SalesPrice.SetMassiveItemImport(FALSE);//Restablecemos flujo normal.
+    END;
+
+    LOCAL PROCEDURE UnitMesureManagement@1000000003(VAR Item@1000000000 : Record 27;VAR ItemUnitofMeasure@1000000001 : Record 5404;RowNo@1000000002 : Integer);
+    BEGIN
+      //Gestion de las Unidades de medida de producto
+      EVALUATE(UnitMesureCode,GetValueAtCell(RowNo,7));//Recogemos el codigo de la unidad de medida.
+      Item."Base Unit of Measure" := UnitMesureCode;//Asignamos la Unidad de medida base.
+      Item."Sales Unit of Measure" := UnitMesureCode;//Asignamos la Unidad de medida de venta.
+      Item."Purch. Unit of Measure" := UnitMesureCode;//Asignamos la Unidad de medida de compra.
+      //Altura
+      HaveHeight := IsEmpty(GetValueAtCell(RowNo,25));//Alto
+      IF HaveHeight THEN
+        EVALUATE(Height,GetValueAtCell(RowNo,25));
+      //Ancho
+      HaveWidth := IsEmpty(GetValueAtCell(RowNo,26));//Ancho
+      IF HaveWidth THEN
+        EVALUATE(Width, GetValueAtCell(RowNo,26));
+      //Peso Neto
+      HaveWeight := IsEmpty(GetValueAtCell(RowNo,23));//PesoNeto
+      IF HaveWeight THEN BEGIN
+        EVALUATE(Weight, GetValueAtCell(RowNo,23));
+        Item."Net Weight" := Weight;
+      END;
+      //Largo
+      HaveLength := IsEmpty(GetValueAtCell(RowNo,27));//Largo
+      IF HaveLength THEN
+        EVALUATE(Length, GetValueAtCell(RowNo,27));
+      //Cantidad por unidad de medida
+      HaveQtyPerUnitMesure := IsEmpty(GetValueAtCell(RowNo,10));
+      IF HaveQtyPerUnitMesure THEN
+        EVALUATE(QtyPerUnitMesure, GetValueAtCell(RowNo,10));
+      //Zona de Comprobaci¢n y asignacion
+      ItemUnitofMeasure.SETRANGE(ItemUnitofMeasure.Code, UnitMesureCode);
+      ItemUnitofMeasure.SETRANGE(ItemUnitofMeasure."Item No.", ItemNoCode);
+      IF ItemUnitofMeasure.FINDFIRST THEN //Si hay codigo de unidad de medida, marcamos para no insertarlo.
+        HaveUnitMesureInBd := TRUE
+      ELSE IF NOT HaveUnitMesureInBd THEN BEGIN
+        ItemUnitofMeasure."Item No." := ItemNoCode;
+        ItemUnitofMeasure.Code := UnitMesureCode;
+        ItemUnitofMeasure.Height := Height;
+        ItemUnitofMeasure.Width := Width;
+        ItemUnitofMeasure.Weight := Weight;
+        ItemUnitofMeasure.Length := Length;
+        ItemUnitofMeasure."Qty. per Unit of Measure" := QtyPerUnitMesure;
+      END;
+    END;
+
+    LOCAL PROCEDURE GenProdPostingGroupManagement@1000000016(VAR GenProductPostingGroup@1000000000 : Record 251;VAR Item@1000000001 : Record 27;RowNo@1000000002 : Integer);
+    BEGIN
+      //gestion de grupo contable producto
+      EVALUATE(GenProdPostGroupCode, GetValueAtCell(RowNo,4));//Asignamos a la variable para comprobaciones.
+      GenProductPostingGroup.SETRANGE(GenProductPostingGroup.Code, GenProdPostGroupCode);
+      IF GenProductPostingGroup.FINDFIRST THEN //Si encuentra el Grupo contable lo asigna al Item.
+        HaveGenProdPostGroupInBd := TRUE
+      ELSE
+        GenProductPostingGroup.Code := GenProdPostGroupCode;
+      Item."Gen. Prod. Posting Group" := GenProdPostGroupCode
+    END;
+
+    LOCAL PROCEDURE VATProductPostingGroupManagement@1000000020(VAR VATProductPostingGroup@1000000000 : Record 324;VAR Item@1000000001 : Record 27;RowNo@1000000002 : Integer);
+    BEGIN
+      //Gestion grupo iva registro
+      EVALUATE(VATProdPostGroupCode, GetValueAtCell(RowNo,5));//Asignamos a la variable para comprobaciones.
+      VATProductPostingGroup.SETRANGE(VATProductPostingGroup.Code,VATProdPostGroupCode);
+      IF VATProductPostingGroup.FINDFIRST THEN
+        HaveVATProdPostGroupInBd := TRUE
+      ELSE
+        VATProductPostingGroup.Code := VATProdPostGroupCode;
+      Item."VAT Prod. Posting Group" := VATProdPostGroupCode;
+    END;
+
+    LOCAL PROCEDURE PurchasePriceManagement@1000000026(VAR PurchasePrice@1000000000 : Record 7012;VAR Item@1000000001 : Record 27;RowNo@1000000002 : Integer);
+    BEGIN
+      //Gestion de precios de compra
+      EVALUATE(DirectUnitCost,GetValueAtCell(RowNo,9));
+      Item."Last Direct Cost" := DirectUnitCost;
+      WITH PurchasePrice DO BEGIN
+        PurchasePrice.SETRANGE("Item No.",ItemNoCode);
+        PurchasePrice.SETRANGE("Vendor No.",VendorNoCode);
+        PurchasePrice.SETRANGE("Currency Code",CurrencyCode);
+        PurchasePrice.SETRANGE("Starting Date",TODAY);
+        PurchasePrice.SETRANGE("Unit of Measure Code",UnitMesureCode);
+        PurchasePrice.SETRANGE("Variant Code",VariantCode);
+        PurchasePrice.SETRANGE("Minimum Quantity",0);
+        IF NOT PurchasePrice.FINDFIRST THEN BEGIN
+          "Item No." := ItemNoCode;
+          "Vendor No." := VendorNoCode;
+          "Currency Code" := CurrencyCode;//Si no tiene no hay codigo en el Validate no deberia estallar
+          "Starting Date" := TODAY;
+          "Unit of Measure Code" := UnitMesureCode;
+          "Minimum Quantity" := 0;//Siempre 0 en toda la tabla esta configurado asi
+          "Variant Code" := VariantCode;
+          IF HaveDirectUnitCost THEN "Direct Unit Cost" := DirectUnitCost;
+        END ELSE
+          HavePurchasePriceInBd := TRUE;
+      END;
+    END;
+
+    LOCAL PROCEDURE ItemCrossReferenceManagement@1000000031(VAR ItemCrossReference@1000000000 : Record 5717;RowNo@1000000002 : Integer);
+    BEGIN
+      //Gestion de referencias cruzadas
+      EVALUATE(ItemCrossReferenceTipeNo,GetValueAtCell(RowNo,19));
+      ItemCrossReference.SETRANGE(ItemCrossReference."Item No.", ItemNoCode);
+      ItemCrossReference.SETRANGE(ItemCrossReference."Variant Code", VariantCode);
+      ItemCrossReference.SETRANGE(ItemCrossReference."Unit of Measure", UnitMesureCode);
+      ItemCrossReference.SETRANGE(ItemCrossReference."Cross-Reference Type",ItemCrossReference."Cross-Reference Type"::"Bar Code");//EAN
+      ItemCrossReference.SETRANGE(ItemCrossReference."Cross-Reference Type No.", ItemCrossReferenceTipeNo);
+      ItemCrossReference.SETRANGE(ItemCrossReference."Cross-Reference No.", '1');//1 a fuego al estar configurado asi en todos los productos
+      IF ItemCrossReference.FINDFIRST THEN
+        HaveItemCrossreferenceInBd := TRUE
+      ELSE
+        BEGIN
+          ItemCrossReference."Item No." := ItemNoCode;
+          ItemCrossReference."Variant Code" := VariantCode;
+          ItemCrossReference."Unit of Measure" := UnitMesureCode;
+          ItemCrossReference."Cross-Reference Type" := ItemCrossReference."Cross-Reference Type"::"Bar Code";
+          ItemCrossReference."Cross-Reference Type No." := ItemCrossReferenceTipeNo;
+          ItemCrossReference."Cross-Reference No." := '1';//1 a fuego al estar configurado asi en todos los productos
+          ItemCrossReference.Description := ItemDescription;
+        END;
+    END;
+
+    LOCAL PROCEDURE ItemDiscountGroupManagement@1000000019(VAR ItemDiscountGroup@1000000000 : Record 341;VAR Item@1000000001 : Record 27;RowNo@1000000002 : Integer);
+    BEGIN
+      //Gestion de Grupo descuento producto
+      EVALUATE(ItemDiscountGroupCode, GetValueAtCell(RowNo,15));
+      Item."Item Disc. Group" := ItemDiscountGroupCode;
+      WITH ItemDiscountGroup DO BEGIN
+        SETRANGE(Code, ItemDiscountGroupCode);
+        IF NOT FINDFIRST THEN BEGIN
+          Code := ItemDiscountGroupCode;
+          Description := ItemDescription;
+          INSERT(TRUE);
+        END;
+      END;
+    END;
+
+    LOCAL PROCEDURE ProductGroupManagement@1000000025(VAR ProductGroup@1000000000 : Record 5723;VAR Item@1000000001 : Record 27;RowNo@1000000002 : Integer);
+    BEGIN
+      //Gestion grupo producto
+      EVALUATE(ProductGroupCode, GetValueAtCell(RowNo, 12));
+      Item."Product Group Code" := ProductGroupCode;
+      IF HaveItemCategoryCode THEN BEGIN//Si hay categoria de producto podemos comprobar si existe el grupo de producto.
+        WITH ProductGroup DO BEGIN
+          SETRANGE("Item Category Code", ItemCategoryCode);
+          SETRANGE(Code,ProductGroupCode);
+          IF NOT FINDFIRST THEN BEGIN
+            "Item Category Code" := ItemCategoryCode;
+            Code := ProductGroupCode;
+            Description := ItemDescription;
+            IF ProductGroup.INSERT(TRUE) THEN;//Para que no explote en caso de que no se pueda insertar.
+          END;
+        END;
+      END;
+    END;
+
+    LOCAL PROCEDURE VariantManagement@1000000000(VAR ItemVariant@1000000000 : Record 5401;VAR Item@1000000007 : Record 27;RowNo@1000000001 : Integer;SecondLoop@1000000008 : Boolean);
+    VAR
+      Productovariante1@1000000002 : Record 50002;
+      Productovariante2@1000000003 : Record 50003;
+      Variant1@1000000004 : Record 50000;
+      Variant2@1000000005 : Record 50001;
+      Buffervariantcombination@1000000006 : Record 50004;
+    BEGIN
+      //Gestion de las variantes personalizadas, si SecondLoop es True significa que tiene mas de una variante
+      //por lo tanto hay que marcar la variable de HaveVariantCode para que la inserte al final del metodo
+      //InsertData.
+      //Reseteamos variables
+      Productovariante1.RESET;
+      Productovariante2.RESET;
+      Variant1.RESET;
+      Variant2.RESET;
+      Buffervariantcombination.RESET;
+      //Fin de reset de Records.
+      //Control de la segunda vuelta en adelante.
+      IF SecondLoop THEN BEGIN
+        HaveItem := IsEmpty(GetValueAtCell(RowNo,1));
+        EVALUATE(ItemNoCode,GetValueAtCell(RowNo,1));
+        HaveVariantCode := IsEmpty(GetValueAtCell(RowNo,18));
+        EVALUATE(VariantCode,GetValueAtCell(RowNo,18));
+        ItemDescription := GetValueAtCell(RowNo,2);
+      END;
+      EVALUATE(VariantCode, GetValueAtCell(RowNo,18));
+      ItemVariant.SETRANGE(ItemVariant."Item No.", ItemNoCode);
+      ItemVariant.SETRANGE(ItemVariant.Code, VariantCode);
+      IF ItemVariant.FINDFIRST THEN
+        HaveVariantInBd := TRUE
+      ELSE
+        ItemVariant.Code := VariantCode;
+        ItemVariant."Item No." := ItemNoCode;
+        ItemVariant.Description := ItemDescription;
+        Item."Variant Filter" := VariantCode;
+        HaveVariantColor := IsEmpty(GetValueAtCell(RowNo,16));
+        //Si hay color en el Excel...
+        IF HaveVariantColor THEN BEGIN
+          EVALUATE(VariantColorCode, GetValueAtCell(RowNo,16));
+          ItemVariant."Variant 1" := VariantColorCode;//COLOR, 50000
+          IF NOT Productovariante1.GET(ItemNoCode, VariantColorCode) THEN BEGIN
+            Productovariante1."N§ producto" := ItemNoCode;
+            Productovariante1."Variant 1" :=  VariantColorCode;//COLOR
+            IF Variant1.GET(Buffervariantcombination."Variant 1") THEN //TBL50000
+              Productovariante1.Descripci¢n := Variant1.Description;
+            Productovariante1.INSERT(TRUE);
+          END;
+        END;
+        //Si hay talla en el Excel...
+        HaveVariantSize := IsEmpty(GetValueAtCell(RowNo,17)); //Talla 50001 Code
+        IF HaveVariantSize THEN BEGIN
+          EVALUATE(VariantSizeCode, GetValueAtCell(RowNo,17));
+          ItemVariant."Variant 2" := VariantSizeCode;
+          ItemVariant."Variant 1-FP" := GetValueAtCell(RowNo,17);//Talla 50003 asignamos en Texto.
+          IF NOT Productovariante2.GET(ItemNoCode, VariantSizeCode) THEN BEGIN
+            Productovariante2."N§ producto" := ItemNoCode;
+            Productovariante2."Variant 2" :=  VariantSizeCode;//TALLA
+            IF Variant2.GET(Buffervariantcombination."Variant 2") THEN//TBL50001
+              Productovariante2.Descripci¢n := Variant2.Description;
+            Productovariante2.INSERT(TRUE);
+          END;
+        END;
+    END;
+
+    LOCAL PROCEDURE ItemCategoryManagement@1000000040(VAR ItemCategory@1000000000 : Record 5722;VAR Item@1000000001 : Record 27;RowNo@1000000002 : Integer);
+    BEGIN
+      //Gesti¢n de categorias de producto
+      EVALUATE(ItemCategoryCode, GetValueAtCell(RowNo,11));
+      Item."Item Category Code" := ItemCategoryCode;
+      WITH ItemCategory DO BEGIN
+        SETRANGE(Code,ItemCategoryCode);
+        IF NOT FINDFIRST THEN BEGIN
+          Code := ItemCategoryCode;
+          Description := ItemDescription;//Descripcion de la categoria no del producto, se hablara.
+          "Def. VAT Prod. Posting Group" := VATProdPostGroupCode;
+          //Faltarian mas cosas por rellenar aunque la PK esta completa y seria funcional asi ya.
+          IF ItemCategory.INSERT(TRUE) THEN;//Para que no explote en caso de que no se pueda insertar.
+        END;//Si hay categoria no se inserta.
+      END;
+    END;
+
+    LOCAL PROCEDURE TariffNumberManagement@1000000048(VAR TariffNumber@1000000000 : Record 260;VAR Item@1000000001 : Record 27;RowNo@1000000002 : Integer);
+    BEGIN
+      //Gestion de codigo arancelario
+      EVALUATE(TariffCode, GetValueAtCell(RowNo,22));
+      TariffNumber.SETRANGE(TariffNumber."No.",TariffCode);
+      IF TariffNumber.FINDFIRST THEN
+        HaveTariffInBd := TRUE
+      ELSE
+        BEGIN
+          TariffNumber."No." := TariffCode;
+          TariffNumber.Description := ItemDescription;
+          TariffNumber."Supplementary Units" := TRUE;//En la tabla esta todo en Si
+        END;
+      Item."Tariff No." := TariffCode;
+    END;
+
+    LOCAL PROCEDURE InventoryPostingGroupManagament@1000000059(VAR InventoryPostingGroup@1000000000 : Record 94;VAR Item@1000000001 : Record 27;RowNo@1000000002 : Integer);
+    BEGIN
+      //Grupo contable inventario
+      EVALUATE(InventoryPostingGroupCode, GetValueAtCell(RowNo,6));
+      InventoryPostingGroup.SETRANGE(InventoryPostingGroup.Code,InventoryPostingGroupCode);
+      IF InventoryPostingGroup.FINDFIRST THEN //Si existe en la BBDD...
+        HaveInvntPostGroupInBd := TRUE
+      ELSE
+        InventoryPostingGroup.Code := InventoryPostingGroupCode;
+      Item."Inventory Posting Group" := InventoryPostingGroupCode;
+    END;
+
+    LOCAL PROCEDURE SalesPriceManagement@1000000069(VAR SalesPrice@1000000000 : Record 7002;VAR Item@1000000001 : Record 27;RowNo@1000000002 : Integer);
+    BEGIN
+      //Zona de Precios de venta Anulado por cliente.
+      // SalesPrice.SETRANGE(SalesPrice."Item No.", ItemNoCode);
+      // SalesPrice.SETRANGE(SalesPrice."Sales Type", SalesPrice."Sales Type"::"Customer Price Group");
+      // SalesPrice.SETRANGE(SalesPrice."Sales Code", CustomerGroupCode);
+      // SalesPrice.SETRANGE(SalesPrice."Starting Date", TODAY);// Fecha inicial, preguntar a Ester, de mientras TODAY
+      // SalesPrice.SETRANGE(SalesPrice."Currency Code", CurrencyCode);
+      // SalesPrice.SETRANGE(SalesPrice."Variant Code", VariantCode);
+      // SalesPrice.SETRANGE(SalesPrice."Unit of Measure Code", UnitMesureCode);
+      // SalesPrice.SETRANGE(SalesPrice."Minimum Quantity", 0);
+      // IF SalesPrice.FINDFIRST THEN
+      //  //Aqui si lo encuentra es que el producto ya esta insertado en la BBDD, no deberia de llegar nunca!
+      //  HaveSalesPriceInBd := TRUE
+      // ELSE
+      //  BEGIN
+      //    SalesPrice."Item No." := ItemNoCode;
+      //    SalesPrice."Sales Type" := SalesPrice."Sales Type"::"Customer Price Group";
+      //    SalesPrice."Sales Code" := CustomerGroupCode;
+      //    SalesPrice."Starting Date" := TODAY;
+      //    SalesPrice."Currency Code" :=  CurrencyCode;
+      //    SalesPrice."Variant Code" := VariantCode;
+      //    SalesPrice."Unit of Measure Code" := UnitMesureCode;
+      //    SalesPrice."Minimum Quantity" := 0;//Siempre 0 en toda la tabla esta configurado asi
+      //    SalesPrice."PVP recomendado" := PVPRecommended;
+      //    SalesPrice."Unit Price" := UnitPrice;
+      //  END;
+    END;
+
+    LOCAL PROCEDURE CheckDescription@1000000005(Description@1000000000 : Text) : Text;
+    VAR
+      DescLenght@1000000001 : Integer;
+      SplitDescription@1000000002 : Text;
+    BEGIN
+      DescLenght := STRLEN(Description); //Comprobamos que la descripci¢n sea de 50 caracteres, sino lo es formatamos la cadena a 50 y quitamos el resto.
+      IF DescLenght <= 50 THEN
+        EXIT(Description)
+      ELSE
+        SplitDescription := COPYSTR(Description, 1, 50);
+        EXIT(SplitDescription);
+    END;
+
+    LOCAL PROCEDURE GetValueAtCell@1000000011(RowNo@1000000000 : Integer;ColNo@1000000001 : Integer) : Text;
+    BEGIN
+      IF ExcelBuff.GET(RowNo,ColNo) THEN;
+      EXIT(ExcelBuff."Cell Value as Text");//Devolvemos el valor a Texto.
+    END;
+
+    LOCAL PROCEDURE IsEmpty@1000000002(CodeToCheck@1000000000 : Variant) : Boolean;
+    VAR
+      CodeToCheckEmpty@1000000001 : Code[20];
+      TextToCheck@1000000002 : Text;
+      DecimalToCheck@1000000003 : Decimal;
+      BooleanToCheck@1000000004 : Boolean;
+    BEGIN
+      //Comprobamos que la celda no este vacia en caso de estarlo.
+      CASE TRUE OF
+        CodeToCheck.ISCODE:
+          BEGIN
+            CodeToCheckEmpty := CodeToCheck;
+            EXIT((CodeToCheckEmpty <> ''));
+          END;
+        CodeToCheck.ISTEXT:
+          BEGIN
+            TextToCheck := CodeToCheck;
+            EXIT((TextToCheck <> '') AND (TextToCheck <>'-'));//Comprobaci¢n de que no este vacio '-' caracter de escape.
+          END;
+        CodeToCheck.ISDECIMAL:
+          BEGIN
+            DecimalToCheck := CodeToCheck;
+            EXIT(DecimalToCheck = 0);
+          END;
+        CodeToCheck.ISBOOLEAN:
+          BEGIN
+            BooleanToCheck := CodeToCheck;
+            IF BooleanToCheck = TRUE THEN
+              EXIT(TRUE)
+            ELSE
+              EXIT(FALSE);
+          END;
+      END;
+    END;
+
+    LOCAL PROCEDURE ClearVariables@1000000032();
+    BEGIN
+      //*********************************************
+      //Como no se pueden limpiar con el CLEARALL (se perderia el RowNo) se utilizan globales y se limpian 1 a 1.
+      CLEAR(HaveItem);
+      CLEAR(HaveDirectUnitCost);
+      CLEAR(HaveUnitMesureCode);
+      CLEAR(HaveUnitMesureInBd);
+      CLEAR(HaveGenProdPostGroupCode);
+      CLEAR(HaveGenProdPostGroupInBd);
+      CLEAR(HaveVATProdPostGroupCode);
+      CLEAR(HaveVATProdPostGroupInBd);
+      CLEAR(HavePurchasePriceInBd);
+      CLEAR(HaveInvntPostGroup);
+      CLEAR(HaveInvntPostGroupInBd);
+      CLEAR(HaveHeight);
+      CLEAR(HaveWeight);
+      CLEAR(HaveWidth);
+      CLEAR(HaveLength);
+      CLEAR(HaveQtyPerUnitMesure);
+      CLEAR(HaveProductGroup);
+      CLEAR(HaveItemCategoryCode);
+      CLEAR(HaveGlbDimCode1);
+      CLEAR(HaveGlbDimCode2);
+      CLEAR(HaveItemDiscountGroup);
+      CLEAR(HaveVendorNo);
+      CLEAR(HaveItemCatalogue);
+      CLEAR(HaveUnitPrice);
+      CLEAR(HavePVPRecommended);
+      CLEAR(HaveGrossWeight);
+      CLEAR(HaveTariff);
+      CLEAR(HaveTariffInBd);
+      CLEAR(HaveVariantCode);
+      CLEAR(HaveVariantColor);
+      CLEAR(HaveVariantInBd);
+      CLEAR(HaveItemCrossreferenceInBd);
+      CLEAR(HaveSalesPriceInBd);
+      CLEAR(HaveVariantSize);
+      CLEAR(HaveCustomerPriceGroup);
+      CLEAR(HaveCurrencyCode);
+      CLEAR(HaveItemCrossReferenceTipeNo);
+      CLEAR(ItemCatalogue);
+      CLEAR(ItemCrossReferenceTipeNo);
+      CLEAR(VariantSizeCode);
+      CLEAR(VariantColorCode);
+      CLEAR(VariantCode);
+      CLEAR(TariffCode);
+      CLEAR(ItemNoCode);
+      CLEAR(UnitMesureCode);
+      CLEAR(GenProdPostGroupCode);
+      CLEAR(VATProdPostGroupCode);
+      CLEAR(InventoryPostingGroupCode);
+      CLEAR(ProductGroupCode);
+      CLEAR(ItemCategoryCode);
+      CLEAR(GlbDimCode1);
+      CLEAR(GlbDimCode2);
+      CLEAR(ItemDiscountGroupCode);
+      CLEAR(VendorNoCode);
+      CLEAR(CustomerGroupCode);
+      CLEAR(CurrencyCode);
+      CLEAR(Height);
+      CLEAR(Weight);
+      CLEAR(Width);
+      CLEAR(Length);
+      CLEAR(UnitPrice);
+      CLEAR(PVPRecommended);
+      CLEAR(GrossWeight);
+      CLEAR(QtyPerUnitMesure);
+      CLEAR(DirectUnitCost);
+      CLEAR(ItemDescription);
+    END;
+
+    LOCAL PROCEDURE ValidateShortcutDimCode@8(FieldNumber@1000 : Integer;VAR ShortcutDimCode@1001 : Code[20];VAR Item@1000000002 : Record 27);
+    BEGIN
+      DimensionManagement.ValidateDimValueCode(FieldNumber,ShortcutDimCode);
+      DimensionManagement.SaveDefaultDim(DATABASE::Item,ItemNoCode,FieldNumber,ShortcutDimCode);
+      Item.MODIFY;
+    END;
+
+    BEGIN
+    {
+      Mod  Task                  Dev    Date            Comments
+      ====================================================================================================================================
+      A01  0000000000000A01      FOB    2018-04-24      Report para la importaci¢n de productos desde Excel.
+    }
+    END.
+  }
+  RDLDATA
+  {
+  }
+}
+
